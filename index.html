@@ -340,6 +340,8 @@
   <button class="tab" onclick="cambiarTab('hogar')">🏠 Gastos del Hogar</button>
   <button class="tab" onclick="cambiarTab('personal')">👤 Gastos Personales</button>
   <button class="tab" onclick="cambiarTab('sueldos')">💼 Sueldos</button>
+  <button class="tab" onclick="cambiarTab('aportes')">🎁 Aportes</button>
+  <button class="tab" onclick="cambiarTab('cuotas')">💳 Cuotas</button>
 </div>
 
 <!-- RESUMEN -->
@@ -528,6 +530,73 @@
   </div>
 </div>
 
+<!-- APORTES -->
+<div id="tab-aportes" class="seccion">
+  <div class="form-card">
+    <h3>➕ Registrar aporte recibido</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Fecha</label>
+        <input type="date" id="aporte-fecha">
+      </div>
+      <div class="form-group">
+        <label>De quién</label>
+        <input type="text" id="aporte-de" placeholder="Ej: Mamá de Agustín">
+      </div>
+      <div class="form-group">
+        <label>Monto ($)</label>
+        <input type="number" id="aporte-monto" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Descripción (opcional)</label>
+        <input type="text" id="aporte-desc" placeholder="Ej: Para el alquiler">
+      </div>
+    </div>
+    <button class="btn btn-verde" onclick="agregarAporte()">Guardar aporte</button>
+  </div>
+  <div class="tabla-card">
+    <h3>🎁 Aportes del mes</h3>
+    <div id="tabla-aportes"></div>
+  </div>
+</div>
+
+<!-- CUOTAS -->
+<div id="tab-cuotas" class="seccion">
+  <div class="form-card">
+    <h3>➕ Registrar compra en cuotas</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Descripción</label>
+        <input type="text" id="cuota-desc" placeholder="Ej: Notebook, Heladera…">
+      </div>
+      <div class="form-group">
+        <label>Monto por cuota ($)</label>
+        <input type="number" id="cuota-monto" placeholder="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Cantidad de cuotas</label>
+        <input type="number" id="cuota-total" placeholder="Ej: 12" min="1">
+      </div>
+      <div class="form-group">
+        <label>Primer mes de cobro</label>
+        <input type="month" id="cuota-inicio">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>¿A nombre de quién?</label>
+        <input type="text" id="cuota-quien" placeholder="Tu nombre">
+      </div>
+    </div>
+    <button class="btn btn-verde" onclick="agregarCuota()">Guardar cuota</button>
+  </div>
+  <div id="cuotas-resumen-mes" style="margin-bottom:1rem"></div>
+  <div class="tabla-card">
+    <h3>💳 Todas las cuotas activas</h3>
+    <div id="tabla-cuotas"></div>
+  </div>
+</div>
+
 </div><!-- fin contenido -->
 
 <script>
@@ -583,6 +652,8 @@ function cargarDatos() {
   d.hogar    = d.hogar    || [];
   d.personal = d.personal || [];
   d.sueldos  = d.sueldos  || [];
+  d.aportes  = d.aportes  || [];
+  d.cuotas   = d.cuotas   || [];
   return d;
 }
 function guardarDatos(d) {
@@ -662,7 +733,10 @@ function cambiarTab(nombre) {
 // =========== FECHA POR DEFECTO ===========
 function setFechasHoy() {
   const f = hoy.toISOString().split('T')[0];
-  ['venta-fecha','hogar-fecha','personal-fecha','sueldo-fecha'].forEach(id => {
+  const mesActual = hoy.toISOString().slice(0,7);
+  const elCuotaInicio = document.getElementById('cuota-inicio');
+  if (elCuotaInicio && !elCuotaInicio.value) elCuotaInicio.value = mesActual;
+  ['venta-fecha','hogar-fecha','personal-fecha','sueldo-fecha','aporte-fecha'].forEach(id => {
     const el = document.getElementById(id);
     if (el && !el.value) el.value = f;
   });
@@ -724,6 +798,50 @@ function agregarGastoPersonal() {
   document.getElementById('personal-desc').value = '';
   document.getElementById('personal-monto').value = '';
   renderTodo();
+}
+
+function agregarAporte() {
+  const d = cargarDatos();
+  const item = {
+    id: Date.now(),
+    fecha: document.getElementById('aporte-fecha').value,
+    de: document.getElementById('aporte-de').value.trim() || 'Sin especificar',
+    monto: parseFloat(document.getElementById('aporte-monto').value) || 0,
+    desc: document.getElementById('aporte-desc').value.trim() || 'Aporte'
+  };
+  if (!item.fecha || !item.monto) { alert('Completá fecha y monto.'); return; }
+  d.aportes.push(item);
+  guardarDatos(d);
+  document.getElementById('aporte-monto').value = '';
+  document.getElementById('aporte-desc').value = '';
+  renderTodo();
+}
+
+function agregarCuota() {
+  const d = cargarDatos();
+  const item = {
+    id: Date.now(),
+    desc: document.getElementById('cuota-desc').value.trim(),
+    montoCuota: parseFloat(document.getElementById('cuota-monto').value) || 0,
+    cuotasTotal: parseInt(document.getElementById('cuota-total').value) || 0,
+    inicio: document.getElementById('cuota-inicio').value,
+    quien: document.getElementById('cuota-quien').value.trim() || 'Sin especificar'
+  };
+  if (!item.desc || !item.montoCuota || !item.cuotasTotal || !item.inicio) { alert('Completá todos los campos.'); return; }
+  d.cuotas.push(item);
+  guardarDatos(d);
+  document.getElementById('cuota-desc').value = '';
+  document.getElementById('cuota-monto').value = '';
+  document.getElementById('cuota-total').value = '';
+  renderTodo();
+}
+
+function cuotaNumEnMes(cuota, mes) {
+  const [ay, am] = cuota.inicio.split('-').map(Number);
+  const [by, bm] = mes.split('-').map(Number);
+  const diff = (by - ay) * 12 + (bm - am);
+  if (diff < 0 || diff >= cuota.cuotasTotal) return null;
+  return diff + 1;
 }
 
 function agregarSueldo() {
@@ -843,17 +961,22 @@ function renderCharts(totalVentas, totalHogar, totalPersonal) {
 // =========== RENDER TODO ===========
 function renderTodo() {
   const d = cargarDatos();
+  const mes         = getMesActual();
   const ventasMes   = filtrarPorMes(d.ventas);
   const hogarMes    = filtrarPorMes(d.hogar);
   const personalMes = filtrarPorMes(d.personal);
   const sueldosMes  = filtrarPorMes(d.sueldos);
+  const aportesMes  = filtrarPorMes(d.aportes);
+  const cuotasMes   = (d.cuotas || []).filter(c => cuotaNumEnMes(c, mes) !== null);
 
   const totalVentas   = ventasMes.reduce((s,r) => s + r.monto, 0);
   const totalHogar    = hogarMes.reduce((s,r) => s + r.monto, 0);
   const totalPersonal = personalMes.reduce((s,r) => s + r.monto, 0);
   const totalSueldos  = sueldosMes.reduce((s,r) => s + r.monto, 0);
-  const totalIngresos = totalVentas + totalSueldos;
-  const totalGastos   = totalHogar + totalPersonal;
+  const totalAportes  = aportesMes.reduce((s,r) => s + r.monto, 0);
+  const totalCuotas   = cuotasMes.reduce((s,c) => s + c.montoCuota, 0);
+  const totalIngresos = totalVentas + totalSueldos + totalAportes;
+  const totalGastos   = totalHogar + totalPersonal + totalCuotas;
   const saldo         = totalIngresos - totalGastos;
 
   // Sueldos por persona
@@ -876,8 +999,10 @@ function renderTodo() {
   document.getElementById('cards-resumen').innerHTML = `
     <div class="card"><div class="card-label">💚 Ventas</div><div class="card-valor verde">${fmt(totalVentas)}</div></div>
     <div class="card"><div class="card-label">💼 Sueldos</div><div class="card-valor verde">${fmt(totalSueldos)}</div>${sueldoDetalle ? `<div style="font-size:0.72rem;color:var(--texto-muted);margin-top:4px;line-height:1.6">${sueldoDetalle}</div>` : ''}</div>
+    ${totalAportes > 0 ? `<div class="card"><div class="card-label">🎁 Aportes</div><div class="card-valor verde">${fmt(totalAportes)}</div></div>` : ''}
     <div class="card"><div class="card-label">🏠 Gasto hogar</div><div class="card-valor azul">${fmt(totalHogar)}</div></div>
     <div class="card"><div class="card-label">👤 Gasto personal</div><div class="card-valor naranja">${fmt(totalPersonal)}</div></div>
+    ${totalCuotas > 0 ? `<div class="card"><div class="card-label">💳 Cuotas este mes</div><div class="card-valor rojo">${fmt(totalCuotas)}</div><div style="font-size:0.72rem;color:var(--texto-muted);margin-top:4px">${cuotasMes.length} cuota${cuotasMes.length !== 1 ? 's' : ''} activa${cuotasMes.length !== 1 ? 's' : ''}</div></div>` : ''}
     <div class="card"><div class="card-label">❤️ Total gastos</div><div class="card-valor rojo">${fmt(totalGastos)}</div></div>
   `;
 
@@ -889,7 +1014,8 @@ function renderTodo() {
     ...ventasMes.map(r => ({...r, _tipo:'venta'})),
     ...hogarMes.map(r => ({...r, _tipo:'hogar'})),
     ...personalMes.map(r => ({...r, _tipo:'personal'})),
-    ...sueldosMes.map(r => ({...r, _tipo:'sueldo'}))
+    ...sueldosMes.map(r => ({...r, _tipo:'sueldo'})),
+    ...aportesMes.map(r => ({...r, _tipo:'aporte'}))
   ].sort((a,b) => b.fecha.localeCompare(a.fecha)).slice(0, 10);
 
   if (!todos.length) {
@@ -898,9 +1024,8 @@ function renderTodo() {
     document.getElementById('tabla-ultimos').innerHTML = `<table>
       <thead><tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Quién</th><th>Monto</th></tr></thead>
       <tbody>${todos.map(r => {
-        const esVenta = r._tipo === 'venta';
-        const esIngreso = esVenta || r._tipo === 'sueldo';
-        const labelTipo = r._tipo === 'venta' ? '🛍️ Venta' : r._tipo === 'hogar' ? '🏠 Hogar' : r._tipo === 'sueldo' ? '💼 Sueldo' : '👤 Personal';
+        const esIngreso = ['venta','sueldo','aporte'].includes(r._tipo);
+        const labelTipo = r._tipo === 'venta' ? '🛍️ Venta' : r._tipo === 'hogar' ? '🏠 Hogar' : r._tipo === 'sueldo' ? '💼 Sueldo' : r._tipo === 'aporte' ? '🎁 Aporte' : '👤 Personal';
         const badgeClass = esIngreso ? 'badge-verde' : r._tipo === 'hogar' ? 'badge-azul' : 'badge-naranja';
         return `<tr>
           <td>${r.fecha.split('-').reverse().join('/')}</td>
@@ -918,6 +1043,79 @@ function renderTodo() {
   renderTabla('tabla-hogar', hogarMes, 'hogar');
   renderTabla('tabla-personal', personalMes, 'personal');
   renderTablaSueldos(sueldosMes);
+  renderTablaAportes(aportesMes);
+  renderTablaCuotas(d.cuotas || [], mes, cuotasMes);
+}
+
+function renderTablaAportes(items) {
+  const el = document.getElementById('tabla-aportes');
+  if (!el) return;
+  if (!items.length) { el.innerHTML = '<div class="vacío"><span>📭</span>No hay aportes este mes</div>'; return; }
+  const sorted = [...items].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  el.innerHTML = `<table>
+    <thead><tr><th>Fecha</th><th>De quién</th><th>Descripción</th><th>Monto</th><th></th></tr></thead>
+    <tbody>${sorted.map(r => `<tr>
+      <td>${r.fecha.split('-').reverse().join('/')}</td>
+      <td><span class="badge badge-verde">${r.de}</span></td>
+      <td>${r.desc}</td>
+      <td style="font-weight:600;color:var(--verde)">${fmt(r.monto)}</td>
+      <td><button class="btn btn-rojo btn-sm" onclick="eliminar('aportes',${r.id})">✕</button></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+function renderTablaCuotas(todasCuotas, mes, cuotasMes) {
+  const resEl = document.getElementById('cuotas-resumen-mes');
+  const tabEl = document.getElementById('tabla-cuotas');
+  if (!resEl || !tabEl) return;
+
+  // Resumen del mes seleccionado
+  if (cuotasMes.length) {
+    const [y, m] = mes.split('-').map(Number);
+    const mesLabel = `${['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][m-1]} ${y}`;
+    resEl.innerHTML = `<div class="form-card" style="border-left:4px solid var(--rojo)">
+      <h3 style="margin-bottom:0.75rem">📅 Cuotas que vienen en ${mesLabel}</h3>
+      ${cuotasMes.map(c => {
+        const n = cuotaNumEnMes(c, mes);
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--borde)">
+          <div><div style="font-weight:600">${c.desc}</div><div style="font-size:0.78rem;color:var(--texto-muted)">${c.quien} · Cuota ${n}/${c.cuotasTotal}</div></div>
+          <div style="font-weight:700;color:var(--rojo)">${fmt(c.montoCuota)}</div>
+        </div>`;
+      }).join('')}
+      <div style="display:flex;justify-content:space-between;padding-top:10px;font-weight:700">
+        <span>Total cuotas</span><span style="color:var(--rojo)">${fmt(cuotasMes.reduce((s,c)=>s+c.montoCuota,0))}</span>
+      </div>
+    </div>`;
+  } else {
+    resEl.innerHTML = '';
+  }
+
+  // Tabla de todas las cuotas
+  if (!todasCuotas.length) { tabEl.innerHTML = '<div class="vacío"><span>💳</span>No hay cuotas registradas</div>'; return; }
+  tabEl.innerHTML = `<table>
+    <thead><tr><th>Descripción</th><th>Quién</th><th>Cuota/mes</th><th>Progreso</th><th>Termina</th><th></th></tr></thead>
+    <tbody>${todasCuotas.map(c => {
+      const [ay, am] = c.inicio.split('-').map(Number);
+      const finDate = new Date(ay, am - 1 + c.cuotasTotal - 1);
+      const finLabel = `${['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][finDate.getMonth()]} ${finDate.getFullYear()}`;
+      const nActual = cuotaNumEnMes(c, mes);
+      const activo = nActual !== null;
+      return `<tr style="${!activo ? 'opacity:0.45' : ''}">
+        <td><strong>${c.desc}</strong>${activo ? ' <span class="badge badge-rojo">Activa</span>' : ''}</td>
+        <td>${c.quien}</td>
+        <td style="font-weight:600;color:var(--rojo)">${fmt(c.montoCuota)}</td>
+        <td style="font-size:0.82rem;color:var(--texto-muted)">${nActual || '—'}/${c.cuotasTotal}</td>
+        <td style="font-size:0.82rem">${finLabel}</td>
+        <td><button class="btn btn-rojo btn-sm" onclick="eliminarCuota(${c.id})">✕</button></td>
+      </tr>`;
+    }).join('')}</tbody></table>`;
+}
+
+function eliminarCuota(id) {
+  if (!confirm('¿Eliminar esta cuota?')) return;
+  const d = cargarDatos();
+  d.cuotas = d.cuotas.filter(c => c.id !== id);
+  guardarDatos(d);
+  renderTodo();
 }
 
 function renderTablaSueldos(items) {
