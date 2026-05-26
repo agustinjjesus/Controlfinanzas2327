@@ -302,8 +302,32 @@
 
 <header>
   <h1>💰 Nuestras Finanzas</h1>
-  <span id="fecha-header"></span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span id="sync-status" style="font-size:0.75rem;opacity:0.8"></span>
+    <span id="fecha-header" style="font-size:0.85rem;opacity:0.7"></span>
+    <button onclick="abrirConfig()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:0.8rem;padding:5px 10px;border-radius:6px;cursor:pointer">⚙️</button>
+  </div>
 </header>
+
+<!-- SETUP JSONBIN -->
+<div id="setup-screen" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;align-items:center;justify-content:center;padding:24px">
+  <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:380px">
+    <div style="font-size:2rem;text-align:center;margin-bottom:10px">☁️</div>
+    <h2 style="font-family:'Fraunces',serif;text-align:center;color:var(--azul);margin-bottom:6px">Conectar sincronización</h2>
+    <p style="font-size:0.82rem;color:var(--texto-muted);text-align:center;margin-bottom:20px;line-height:1.5">Ingresá tus credenciales de <strong>JSONBin.io</strong> para sincronizar los datos entre dispositivos</p>
+    <div style="margin-bottom:10px">
+      <label style="font-size:0.78rem;font-weight:600;color:var(--texto-muted);display:block;margin-bottom:4px">Master Key</label>
+      <input type="text" id="setup-apikey" placeholder="$2a$10$..." style="width:100%;padding:9px 12px;border:1px solid var(--borde);border-radius:8px;font-family:monospace;font-size:0.85rem;outline:none"/>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:0.78rem;font-weight:600;color:var(--texto-muted);display:block;margin-bottom:4px">Bin ID</label>
+      <input type="text" id="setup-binid" placeholder="6849a2f..." style="width:100%;padding:9px 12px;border:1px solid var(--borde);border-radius:8px;font-family:monospace;font-size:0.85rem;outline:none"/>
+    </div>
+    <div id="setup-error" style="color:var(--rojo);font-size:0.8rem;min-height:16px;margin-bottom:10px;text-align:center"></div>
+    <button onclick="guardarConfig()" style="width:100%;background:var(--verde);color:#fff;border:none;border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-size:0.95rem;font-weight:600;cursor:pointer" id="setup-btn">Conectar</button>
+    <button onclick="usarSinSync()" style="width:100%;background:transparent;color:var(--texto-muted);border:none;padding:10px;font-size:0.82rem;cursor:pointer;margin-top:4px">Usar sin sincronización</button>
+  </div>
+</div>
 
 <div class="mes-bar">
   <label>Mes:</label>
@@ -475,12 +499,93 @@
 </div><!-- fin contenido -->
 
 <script>
+// =========== JSONBIN ===========
+let BIN_ID  = localStorage.getItem('fin_bin_id')  || '';
+let API_KEY = localStorage.getItem('fin_api_key') || '';
+const JBURL = () => `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+const JBHDR = () => ({'X-Master-Key': API_KEY, 'Content-Type': 'application/json'});
+
+function setSyncStatus(s) {
+  const el = document.getElementById('sync-status');
+  if (s === 'ok')      el.textContent = '🟢 Sincronizado';
+  else if (s === 'syncing') el.textContent = '🔄 Sincronizando…';
+  else if (s === 'error')   el.textContent = '🔴 Sin conexión';
+  else el.textContent = '';
+}
+
+async function cargarDatosRemoto() {
+  if (!BIN_ID || !API_KEY) return false;
+  try {
+    setSyncStatus('syncing');
+    const r = await fetch(JBURL() + '/latest', {headers: {'X-Master-Key': API_KEY}});
+    if (!r.ok) throw new Error();
+    const datos = (await r.json()).record;
+    datos.ventas   = datos.ventas   || [];
+    datos.hogar    = datos.hogar    || [];
+    datos.personal = datos.personal || [];
+    localStorage.setItem('finanzas_data', JSON.stringify(datos));
+    setSyncStatus('ok');
+    return true;
+  } catch {
+    setSyncStatus('error');
+    return false;
+  }
+}
+
+async function guardarDatosRemoto(d) {
+  localStorage.setItem('finanzas_data', JSON.stringify(d));
+  if (!BIN_ID || !API_KEY) return;
+  setSyncStatus('syncing');
+  try {
+    await fetch(JBURL(), {method:'PUT', headers:JBHDR(), body:JSON.stringify(d)});
+    setSyncStatus('ok');
+  } catch {
+    setSyncStatus('error');
+  }
+}
+
 // =========== DATOS ===========
 function cargarDatos() {
   return JSON.parse(localStorage.getItem('finanzas_data') || '{"ventas":[],"hogar":[],"personal":[]}');
 }
 function guardarDatos(d) {
-  localStorage.setItem('finanzas_data', JSON.stringify(d));
+  guardarDatosRemoto(d);
+}
+
+// =========== CONFIG ===========
+function abrirConfig() {
+  document.getElementById('setup-apikey').value = API_KEY;
+  document.getElementById('setup-binid').value  = BIN_ID;
+  document.getElementById('setup-error').textContent = '';
+  document.getElementById('setup-screen').style.display = 'flex';
+}
+
+async function guardarConfig() {
+  const key = document.getElementById('setup-apikey').value.trim();
+  const bin = document.getElementById('setup-binid').value.trim();
+  if (!key || !bin) { document.getElementById('setup-error').textContent = 'Completá ambos campos'; return; }
+  const btn = document.getElementById('setup-btn');
+  btn.textContent = 'Conectando…'; btn.disabled = true;
+  try {
+    const r = await fetch(`https://api.jsonbin.io/v3/b/${bin}/latest`, {headers:{'X-Master-Key':key}});
+    if (!r.ok) throw new Error();
+    const datos = (await r.json()).record;
+    localStorage.setItem('fin_api_key', key);
+    localStorage.setItem('fin_bin_id',  bin);
+    localStorage.setItem('finanzas_data', JSON.stringify({ventas:datos.ventas||[],hogar:datos.hogar||[],personal:datos.personal||[]}));
+    API_KEY = key; BIN_ID = bin;
+    document.getElementById('setup-screen').style.display = 'none';
+    setSyncStatus('ok');
+    renderTodo();
+  } catch {
+    document.getElementById('setup-error').textContent = '❌ Credenciales incorrectas';
+  }
+  btn.textContent = 'Conectar'; btn.disabled = false;
+}
+
+function usarSinSync() {
+  document.getElementById('setup-screen').style.display = 'none';
+  setSyncStatus('');
 }
 
 // =========== MES ===========
@@ -752,6 +857,11 @@ function renderTodo() {
 document.getElementById('fecha-header').textContent = hoy.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
 initMesSelector();
 setFechasHoy();
+if (!BIN_ID || !API_KEY) {
+  document.getElementById('setup-screen').style.display = 'flex';
+} else {
+  cargarDatosRemoto().then(() => renderTodo());
+}
 renderTodo();
 </script>
 </body>
